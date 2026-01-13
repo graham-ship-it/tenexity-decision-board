@@ -1924,6 +1924,30 @@ Keep it concise and actionable.`;
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    {/* View Switcher */}
+                                    <div className="flex bg-gray-100 rounded-lg p-1 mr-2">
+                                        <button
+                                            onClick={() => setViewMode('list')}
+                                            className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                            title="List View"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                                        </button>
+                                        <button
+                                            onClick={() => setViewMode('kanban')}
+                                            className={`p-1.5 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                            title="Kanban View"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+                                        </button>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setShowTopicForm(true)}
+                                        className="px-3 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                                    >
+                                        + New Topic
+                                    </button>
                                     <button
                                         onClick={() => setShowInvite(true)}
                                         className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
@@ -1950,10 +1974,10 @@ Keep it concise and actionable.`;
                                 </div>
                             </div>
                         </div>
-                    </header>
+                    </header >
 
                     {/* Main content */}
-                    <div className="max-w-7xl mx-auto px-4 py-6">
+                    < div className="max-w-7xl mx-auto px-4 py-6" >
                         <div className="flex gap-6">
                             {/* Main View Area */}
                             {viewMode === 'kanban' ? (
@@ -1973,28 +1997,7 @@ Keep it concise and actionable.`;
                                                 <div className="flex items-center justify-between mb-3">
                                                     <h2 className="font-semibold text-gray-800">Topics</h2>
                                                     <div className="flex gap-2">
-                                                        <div className="flex bg-gray-100 rounded-lg p-1">
-                                                            <button
-                                                                onClick={() => setViewMode('list')}
-                                                                className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
-                                                                title="List View"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setViewMode('kanban')}
-                                                                className={`p-1.5 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
-                                                                title="Kanban View"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
-                                                            </button>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setShowTopicForm(true)}
-                                                            className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-                                                        >
-                                                            + New
-                                                        </button>
+                                                        {/* View Switcher moved to Header */}
                                                     </div>
                                                 </div>
 
@@ -2281,7 +2284,7 @@ Keep it concise and actionable.`;
                             )}
 
                         </div>
-                    </div>
+                    </div >
 
                     <SettingsModal
                         isOpen={showSettings}
@@ -2293,7 +2296,7 @@ Keep it concise and actionable.`;
                         isOpen={showInvite}
                         onClose={() => setShowInvite(false)}
                     />
-                </div>
+                </div >
             );
         };
 
