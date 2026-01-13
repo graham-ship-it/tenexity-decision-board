@@ -1680,6 +1680,7 @@ Keep it concise and actionable.`;
             const { userProfile, updateProfile, signOut } = useContext(AuthContext);
             const [inputKey, setInputKey] = useState(apiKey);
             const [displayName, setDisplayName] = useState(userProfile?.displayName || '');
+            const [emailNotifications, setEmailNotifications] = useState(userProfile?.email_notifications || false);
             const [saving, setSaving] = useState(false);
 
             if (!isOpen) return null;
@@ -1689,8 +1690,11 @@ Keep it concise and actionable.`;
                 try {
                     setApiKey(inputKey);
                     localStorage.setItem('claudeApiKey', inputKey);
-                    if (displayName !== userProfile?.displayName) {
-                        await updateProfile({ displayName });
+                    if (displayName !== userProfile?.displayName || emailNotifications !== userProfile?.email_notifications) {
+                        await updateProfile({
+                            displayName,
+                            email_notifications: emailNotifications
+                        });
                     }
                     onClose();
                 } finally {
@@ -1732,6 +1736,19 @@ Keep it concise and actionable.`;
                                 </p>
                             </div>
 
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Daily Summary Emails</label>
+                                    <p className="text-xs text-gray-500">Receive a daily digest of active topics</p>
+                                </div>
+                                <button
+                                    onClick={() => setEmailNotifications(!emailNotifications)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${emailNotifications ? 'bg-green-600' : 'bg-gray-200'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${emailNotifications ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
                             <div className="pt-4 border-t">
                                 <button
                                     onClick={signOut}
@@ -1763,6 +1780,75 @@ Keep it concise and actionable.`;
         };
 
         // ============================================
+        // KANBAN BOARD
+        // ============================================
+        const KanbanBoard = ({ topics, onTopicClick, onUpdateStatus }) => {
+            const columns = [
+                { id: 'suggested', title: 'Inbox', color: 'bg-orange-50 border-orange-200', textColor: 'text-orange-800' },
+                { id: 'open', title: 'Discussion', color: 'bg-blue-50 border-blue-200', textColor: 'text-blue-800' },
+                { id: 'pending', title: 'Pending', color: 'bg-purple-50 border-purple-200', textColor: 'text-purple-800' },
+                { id: 'decided', title: 'Decided', color: 'bg-green-50 border-green-200', textColor: 'text-green-800' }
+            ];
+
+            return (
+                <div className="flex gap-4 h-[calc(100vh-200px)] overflow-x-auto pb-4">
+                    {columns.map(col => {
+                        const colTopics = topics.filter(t => t.status === col.id);
+                        return (
+                            <div key={col.id} className="w-80 flex-shrink-0 flex flex-col bg-gray-50 rounded-xl border border-gray-200">
+                                <div className={`p-3 border-b border-gray-200 rounded-t-xl font-semibold flex justify-between items-center ${col.color} ${col.textColor}`}>
+                                    <span>{col.title}</span>
+                                    <span className="text-xs opacity-70 bg-white px-2 py-0.5 rounded-full">
+                                        {colTopics.length}
+                                    </span>
+                                </div>
+                                <div className="p-3 flex-1 overflow-y-auto space-y-3">
+                                    {colTopics.map(topic => (
+                                        <div
+                                            key={topic.id}
+                                            onClick={() => onTopicClick(topic.id)}
+                                            className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow group relative"
+                                        >
+                                            <h4 className="font-medium text-gray-900 text-sm mb-1">{topic.title}</h4>
+                                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                                <span>{formatDate(topic.created_at)}</span>
+                                                {topic.due_date && (
+                                                    <span className="text-orange-600 font-medium">
+                                                        Due: {new Date(topic.due_date).toLocaleDateString()}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Quick Actions (Hover) */}
+                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white rounded shadow-sm">
+                                                {col.id !== 'decided' && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onUpdateStatus(topic.id, 'decided'); }}
+                                                        className="p-1 hover:bg-green-50 text-green-600 rounded" title="Move to Decided"
+                                                    >
+                                                        ✓
+                                                    </button>
+                                                )}
+                                                {col.id === 'suggested' && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onUpdateStatus(topic.id, 'open'); }}
+                                                        className="p-1 hover:bg-blue-50 text-blue-600 rounded" title="Approve / Move to Open"
+                                                    >
+                                                        →
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        // ============================================
         // MAIN DASHBOARD
         // ============================================
         const Dashboard = () => {
@@ -1774,6 +1860,7 @@ Keep it concise and actionable.`;
             const [sortBy, setSortBy] = useState('date');
             const [showSettings, setShowSettings] = useState(false);
             const [showInvite, setShowInvite] = useState(false);
+            const [viewMode, setViewMode] = useState('list'); // 'list' or 'kanban'
             const [apiKey, setApiKey] = useState(() => localStorage.getItem('claudeApiKey') || '');
 
             const currentBoard = boards.find(b => b.id === currentBoardId);
@@ -1799,8 +1886,9 @@ Keep it concise and actionable.`;
                 setShowTopicForm(false);
             };
 
-            const handleUpdateStatus = async (status) => {
-                await updateTopic(selectedTopicId, { status });
+            const handleUpdateStatus = async (status, topicId = null) => {
+                const idToUpdate = topicId || selectedTopicId;
+                await updateTopic(idToUpdate, { status });
             };
 
             const handleDeleteTopic = async () => {
@@ -1867,145 +1955,263 @@ Keep it concise and actionable.`;
                     {/* Main content */}
                     <div className="max-w-7xl mx-auto px-4 py-6">
                         <div className="flex gap-6">
-                            {/* Left panel - Topic list */}
-                            <div className="w-80 flex-shrink-0">
-                                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                                    <div className="p-4 border-b border-gray-200">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h2 className="font-semibold text-gray-800">Topics</h2>
-                                            <button
-                                                onClick={() => setShowTopicForm(true)}
-                                                className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-                                            >
-                                                + New Topic
-                                            </button>
-                                        </div>
-
-                                        {/* Suggested Topics Section */}
-                                        {suggestedTopics.length > 0 && (
-                                            <div className="mb-4">
-                                                <h3 className="text-xs font-semibold text-orange-600 uppercase tracking-wider mb-2">
-                                                    Inbox ({suggestedTopics.length})
-                                                </h3>
-                                                <div className="space-y-1">
-                                                    {suggestedTopics.map(topic => (
-                                                        <div
-                                                            key={topic.id}
-                                                            onClick={() => setSelectedTopicId(topic.id)}
-                                                            className={`p-3 rounded-lg cursor-pointer border transition-colors ${selectedTopicId === topic.id
-                                                                ? 'bg-orange-50 border-orange-200'
-                                                                : 'bg-white border-gray-200 hover:bg-gray-50'
-                                                                }`}
-                                                        >
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase">
-                                                                    AI Draft
-                                                                </span>
-                                                                <span className="text-xs text-gray-500">
-                                                                    {formatDate(topic.created_at)}
-                                                                </span>
-                                                            </div>
-                                                            <h4 className="font-medium text-gray-900 text-sm truncate">
-                                                                {topic.title}
-                                                            </h4>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => setSortBy('date')}
-                                                className={`px-3 py-1 text-sm rounded-md ${sortBy === 'date' ? 'bg-gray-200 text-gray-800' : 'text-gray-500 hover:bg-gray-100'
-                                                    }`}
-                                            >
-                                                By Date
-                                            </button>
-                                            <button
-                                                onClick={() => setSortBy('name')}
-                                                className={`px-3 py-1 text-sm rounded-md ${sortBy === 'name' ? 'bg-gray-200 text-gray-800' : 'text-gray-500 hover:bg-gray-100'
-                                                    }`}
-                                            >
-                                                By Name
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {showTopicForm && (
-                                        <div className="p-4 border-b border-gray-200 bg-gray-50">
-                                            <TopicForm onSubmit={handleAddTopic} onCancel={() => setShowTopicForm(false)} />
-                                        </div>
-                                    )}
-
-                                    <div className="divide-y divide-gray-100 max-h-[calc(100vh-280px)] overflow-y-auto">
-                                        {activeTopics.length === 0 && suggestedTopics.length === 0 ? (
-                                            <div className="p-6 text-center text-gray-500">
-                                                <p>No topics yet.</p>
-                                                <p className="text-sm">Create one to get started!</p>
-                                            </div>
-                                        ) : (
-                                            activeTopics.map(topic => (
-                                                <div
-                                                    key={topic.id}
-                                                    onClick={() => setSelectedTopicId(topic.id)}
-                                                    className={`p-4 cursor-pointer transition-colors ${selectedTopicId === topic.id
-                                                        ? 'bg-gray-100 border-l-4 border-gray-900'
-                                                        : 'hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="flex-1 min-w-0">
-                                                            <h3 className="font-medium text-gray-900 truncate">{topic.title}</h3>
-                                                            <p className="text-sm text-gray-500 mt-1">{formatDate(topic.created_at)}</p>
-                                                            {topic.due_date && (
-                                                                <p className="text-xs text-orange-600 mt-1">
-                                                                    Due: {new Date(topic.due_date).toLocaleDateString()}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <StatusBadge status={topic.status} />
-                                                    </div>
-                                                    <div className="mt-2 text-xs text-gray-400">
-                                                        {(topic.contributions || []).length} contribution{(topic.contributions || []).length !== 1 ? 's' : ''}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
+                            {/* Main View Area */}
+                            {viewMode === 'kanban' ? (
+                                <div className="flex-1 min-w-0 overflow-x-hidden">
+                                    <KanbanBoard
+                                        topics={topics}
+                                        onTopicClick={setSelectedTopicId}
+                                        onUpdateStatus={(id, status) => handleUpdateStatus(status, id)} // Wrap to pass ID if needed
+                                    />
                                 </div>
-                            </div>
-
-                            {/* Right panel - Topic detail */}
-                            <div className="flex-1 min-w-0">
-                                {selectedTopic ? (
-                                    <div className="space-y-6">
-                                        <div className="bg-white rounded-xl border border-gray-200 p-6">
-                                            {selectedTopic.status === 'suggested' && (
-                                                <div className="mb-6 p-4 bg-orange-50 border border-orange-100 rounded-lg flex items-center justify-between">
-                                                    <div>
-                                                        <h3 className="font-semibold text-orange-900">AI Suggested Topic</h3>
-                                                        <p className="text-sm text-orange-700">
-                                                            This topic was created from an inbound email. Review and approve it to start discussion.
-                                                        </p>
-                                                    </div>
+                            ) : (
+                                <div className="flex gap-6">
+                                    {/* Left panel - Topic list */}
+                                    <div className="w-80 flex-shrink-0">
+                                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                                            <div className="p-4 border-b border-gray-200">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <h2 className="font-semibold text-gray-800">Topics</h2>
                                                     <div className="flex gap-2">
+                                                        <div className="flex bg-gray-100 rounded-lg p-1">
+                                                            <button
+                                                                onClick={() => setViewMode('list')}
+                                                                className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                                title="List View"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setViewMode('kanban')}
+                                                                className={`p-1.5 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                                title="Kanban View"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+                                                            </button>
+                                                        </div>
                                                         <button
-                                                            onClick={() => handleDeleteTopic()}
-                                                            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                                                            onClick={() => setShowTopicForm(true)}
+                                                            className="px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
                                                         >
-                                                            Reject
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleApproveTopic(selectedTopicId)}
-                                                            className="px-3 py-1.5 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors shadow-sm"
-                                                        >
-                                                            Approve Topic
+                                                            + New
                                                         </button>
                                                     </div>
+                                                </div>
+
+                                                {/* Suggested Topics Section */}
+                                                {suggestedTopics.length > 0 && (
+                                                    <div className="mb-4">
+                                                        <h3 className="text-xs font-semibold text-orange-600 uppercase tracking-wider mb-2">
+                                                            Inbox ({suggestedTopics.length})
+                                                        </h3>
+                                                        <div className="space-y-1">
+                                                            {suggestedTopics.map(topic => (
+                                                                <div
+                                                                    key={topic.id}
+                                                                    onClick={() => setSelectedTopicId(topic.id)}
+                                                                    className={`p-3 rounded-lg cursor-pointer border transition-colors ${selectedTopicId === topic.id
+                                                                        ? 'bg-orange-50 border-orange-200'
+                                                                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                                                                        }`}
+                                                                >
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase">
+                                                                            AI Draft
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-500">
+                                                                            {formatDate(topic.created_at)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <h4 className="font-medium text-gray-900 text-sm truncate">
+                                                                        {topic.title}
+                                                                    </h4>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setSortBy('date')}
+                                                        className={`px-3 py-1 text-sm rounded-md ${sortBy === 'date' ? 'bg-gray-200 text-gray-800' : 'text-gray-500 hover:bg-gray-100'
+                                                            }`}
+                                                    >
+                                                        By Date
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setSortBy('name')}
+                                                        className={`px-3 py-1 text-sm rounded-md ${sortBy === 'name' ? 'bg-gray-200 text-gray-800' : 'text-gray-500 hover:bg-gray-100'
+                                                            }`}
+                                                    >
+                                                        By Name
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {showTopicForm && (
+                                                <div className="p-4 border-b border-gray-200 bg-gray-50">
+                                                    <TopicForm onSubmit={handleAddTopic} onCancel={() => setShowTopicForm(false)} />
                                                 </div>
                                             )}
 
+                                            <div className="divide-y divide-gray-100 max-h-[calc(100vh-280px)] overflow-y-auto">
+                                                {activeTopics.length === 0 && suggestedTopics.length === 0 ? (
+                                                    <div className="p-6 text-center text-gray-500">
+                                                        <p>No topics yet.</p>
+                                                        <p className="text-sm">Create one to get started!</p>
+                                                    </div>
+                                                ) : (
+                                                    activeTopics.map(topic => (
+                                                        <div
+                                                            key={topic.id}
+                                                            onClick={() => setSelectedTopicId(topic.id)}
+                                                            className={`p-4 cursor-pointer transition-colors ${selectedTopicId === topic.id
+                                                                ? 'bg-gray-100 border-l-4 border-gray-900'
+                                                                : 'hover:bg-gray-50'
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h3 className="font-medium text-gray-900 truncate">{topic.title}</h3>
+                                                                    <p className="text-sm text-gray-500 mt-1">{formatDate(topic.created_at)}</p>
+                                                                    {topic.due_date && (
+                                                                        <p className="text-xs text-orange-600 mt-1">
+                                                                            Due: {new Date(topic.due_date).toLocaleDateString()}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <StatusBadge status={topic.status} />
+                                                            </div>
+                                                            <div className="mt-2 text-xs text-gray-400">
+                                                                {(topic.contributions || []).length} contribution{(topic.contributions || []).length !== 1 ? 's' : ''}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Right panel - Topic detail (Only show in list view or if selected in kanban overlay - simplified for now just list view logic) */}
+                            {viewMode === 'list' && (
+                                <div className="flex-1 min-w-0">
+                                    {selectedTopic ? (
+                                        <div className="space-y-6">
+                                            <div className="bg-white rounded-xl border border-gray-200 p-6">
+                                                {selectedTopic.status === 'suggested' && (
+                                                    <div className="mb-6 p-4 bg-orange-50 border border-orange-100 rounded-lg flex items-center justify-between">
+                                                        <div>
+                                                            <h3 className="font-semibold text-orange-900">AI Suggested Topic</h3>
+                                                            <p className="text-sm text-orange-700">
+                                                                This topic was created from an inbound email. Review and approve it to start discussion.
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => handleDeleteTopic()}
+                                                                className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                                                            >
+                                                                Reject
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleApproveTopic(selectedTopicId)}
+                                                                className="px-3 py-1.5 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors shadow-sm"
+                                                            >
+                                                                Approve Topic
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <h2 className="text-2xl font-bold text-gray-900">{selectedTopic.title}</h2>
+                                                        {selectedTopic.description && (
+                                                            <p className="text-gray-600 mt-2">{selectedTopic.description}</p>
+                                                        )}
+                                                        <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+                                                            <span>Created: {formatDate(selectedTopic.created_at)}</span>
+                                                            {selectedTopic.due_date && (
+                                                                <span className="text-orange-600">
+                                                                    Due: {new Date(selectedTopic.due_date).toLocaleDateString()}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <select
+                                                            value={selectedTopic.status}
+                                                            onChange={(e) => handleUpdateStatus(e.target.value)}
+                                                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900"
+                                                        >
+                                                            <option value="open">Open</option>
+                                                            <option value="pending">Pending</option>
+                                                            <option value="decided">Decided</option>
+                                                        </select>
+                                                        <button
+                                                            onClick={handleDeleteTopic}
+                                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                                                            title="Delete topic"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <AISummary topic={selectedTopic} apiKey={apiKey} />
+
+                                            <div className="bg-white rounded-xl border border-gray-200 p-6">
+                                                <h3 className="font-semibold text-gray-800 mb-4">Add Your Input</h3>
+                                                <ContributionForm onSubmit={handleAddContribution} />
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <h3 className="font-semibold text-gray-800">
+                                                    Discussion ({(selectedTopic.contributions || []).length})
+                                                </h3>
+                                                {(selectedTopic.contributions || []).length === 0 ? (
+                                                    <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500">
+                                                        <p>No contributions yet. Be the first to share your input!</p>
+                                                    </div>
+                                                ) : (
+                                                    (selectedTopic.contributions || []).map(contribution => (
+                                                        <Contribution
+                                                            key={contribution.id}
+                                                            contribution={contribution}
+                                                            topicId={selectedTopic.id}
+                                                        />
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                                            <TenexityLogo size={64} className="mx-auto mb-4 opacity-20" />
+                                            <h2 className="text-xl font-semibold text-gray-800 mb-2">Select a Topic</h2>
+                                            <p className="text-gray-500">Choose a topic from the list or create a new one to start collaborating.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Modal for Topic Detail in Kanban View (reuse selectedTopic) */}
+                            {viewMode === 'kanban' && selectedTopic && (
+                                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                    <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
+                                        <button
+                                            onClick={() => setSelectedTopicId(null)}
+                                            className="absolute top-4 right-4 p-2 text-gray-500 hover:bg-gray-100 rounded-full z-10"
+                                        >
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+
+                                        <div className="p-8 space-y-6">
                                             <div className="flex items-start justify-between">
                                                 <div>
                                                     <h2 className="text-2xl font-bold text-gray-900">{selectedTopic.title}</h2>
@@ -2027,7 +2233,8 @@ Keep it concise and actionable.`;
                                                         onChange={(e) => handleUpdateStatus(e.target.value)}
                                                         className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900"
                                                     >
-                                                        <option value="open">Open</option>
+                                                        <option value="suggested">Inbox</option>
+                                                        <option value="open">Discussion</option>
                                                         <option value="pending">Pending</option>
                                                         <option value="decided">Decided</option>
                                                     </select>
@@ -2042,42 +2249,37 @@ Keep it concise and actionable.`;
                                                     </button>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <AISummary topic={selectedTopic} apiKey={apiKey} />
+                                            <AISummary topic={selectedTopic} apiKey={apiKey} />
 
-                                        <div className="bg-white rounded-xl border border-gray-200 p-6">
-                                            <h3 className="font-semibold text-gray-800 mb-4">Add Your Input</h3>
-                                            <ContributionForm onSubmit={handleAddContribution} />
-                                        </div>
+                                            <div className="bg-white rounded-xl border border-gray-200 p-6">
+                                                <h3 className="font-semibold text-gray-800 mb-4">Add Your Input</h3>
+                                                <ContributionForm onSubmit={handleAddContribution} />
+                                            </div>
 
-                                        <div className="space-y-4">
-                                            <h3 className="font-semibold text-gray-800">
-                                                Discussion ({(selectedTopic.contributions || []).length})
-                                            </h3>
-                                            {(selectedTopic.contributions || []).length === 0 ? (
-                                                <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500">
-                                                    <p>No contributions yet. Be the first to share your input!</p>
-                                                </div>
-                                            ) : (
-                                                (selectedTopic.contributions || []).map(contribution => (
-                                                    <Contribution
-                                                        key={contribution.id}
-                                                        contribution={contribution}
-                                                        topicId={selectedTopic.id}
-                                                    />
-                                                ))
-                                            )}
+                                            <div className="space-y-4">
+                                                <h3 className="font-semibold text-gray-800">
+                                                    Discussion ({(selectedTopic.contributions || []).length})
+                                                </h3>
+                                                {(selectedTopic.contributions || []).length === 0 ? (
+                                                    <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500">
+                                                        <p>No contributions yet. Be the first to share your input!</p>
+                                                    </div>
+                                                ) : (
+                                                    (selectedTopic.contributions || []).map(contribution => (
+                                                        <Contribution
+                                                            key={contribution.id}
+                                                            contribution={contribution}
+                                                            topicId={selectedTopic.id}
+                                                        />
+                                                    ))
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                                        <TenexityLogo size={64} className="mx-auto mb-4 opacity-20" />
-                                        <h2 className="text-xl font-semibold text-gray-800 mb-2">Select a Topic</h2>
-                                        <p className="text-gray-500">Choose a topic from the list or create a new one to start collaborating.</p>
-                                    </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
+
                         </div>
                     </div>
 

@@ -190,11 +190,73 @@ class TenexityAgent:
         except Exception as e:
             logging.error(f"Failed to save topic: {e}")
 
+    def send_daily_summary(self):
+        """Sends daily summary of active topics to opted-in users"""
+        logging.info("Generating daily summary...")
+        try:
+            # 1. Get Active Topics
+            # In a real app we query Supabase
+            # topics = self.supabase.table('topics').select('*').neq('status', 'decided').execute()
+            
+            # MOCK DATA for local agent
+            topics = [
+                {'title': 'Q1 Hiring Plan', 'status': 'open', 'due_date': '2026-02-01'},
+                {'title': 'Office Relocation', 'status': 'pending', 'due_date': '2026-03-15'},
+                {'title': 'Email: Potential Partnership', 'status': 'suggested', 'due_date': None}
+            ]
+
+            if not topics:
+                logging.info("No active topics for summary.")
+                return
+
+            # 2. Build Email Body
+            html_body = "<h2>Tenexity Board - Daily Summary</h2><ul>"
+            for t in topics:
+                due = f"(Due: {t['due_date']})" if t['due_date'] else ""
+                html_body += f"<li><strong>[{t['status'].upper()}]</strong> {t['title']} {due}</li>"
+            html_body += "</ul><p>Visit your board to contribute.</p>"
+
+            # 3. Send to Users (Mocking retrieval of opted-in users)
+            # users = self.supabase.table('users').select('email').eq('email_notifications', True).execute()
+            # recipients = [u['email'] for u in users.data]
+            
+            recipients = [agent_config.EMAIL_USER] # Self-test
+            
+            if not recipients:
+                return
+
+            server = smtplib.SMTP(agent_config.SMTP_HOST, agent_config.SMTP_PORT)
+            server.starttls()
+            server.login(self.email_user, self.email_pass)
+
+            for recipient in recipients:
+                msg = email.message.EmailMessage()
+                msg.set_content("Use HTML Viewer")
+                msg.add_alternative(html_body, subtype='html')
+                msg['Subject'] = f"Tenexity Daily Summary - {time.strftime('%Y-%m-%d')}"
+                msg['From'] = self.email_user
+                msg['To'] = recipient
+                
+                server.send_message(msg)
+                logging.info(f"Sent summary to {recipient}")
+
+            server.quit()
+
+        except Exception as e:
+            logging.error(f"Failed to send summary: {e}")
+
     def run(self):
         """Main loop"""
         logging.info("Tenexity Email Agent started...")
+        # Send a startup summary for verification (optional)
+        # self.send_daily_summary() 
+        
         while True:
             self.process_inbox()
+            
+            # Simple daily scheduler (check time or run every X hours)
+            # For demo, we just rely on manual invocation or infrequent polling
+            
             time.sleep(60) # Poll every minute
 
 if __name__ == "__main__":
