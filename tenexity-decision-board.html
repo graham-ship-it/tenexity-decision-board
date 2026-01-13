@@ -63,10 +63,8 @@
         );
 
         const TenexityLogoFull = ({ height = 32 }) => (
-            <div className="flex items-center gap-1">
-                <span className="text-xl font-light tracking-widest text-gray-900">Tene</span>
-                <TenexityLogo size={height} />
-                <span className="text-xl font-light tracking-widest text-gray-900">ity</span>
+            <div className="flex items-center gap-1 justify-center">
+                <TenexityLogo size={height * 1.5} />
             </div>
         );
 
@@ -1345,10 +1343,7 @@ Keep it concise and actionable.`;
                 <div className="min-h-screen bg-white flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 w-full max-w-md">
                         <div className="text-center mb-8">
-                            <div className="flex justify-center mb-4">
-                                <TenexityLogo size={64} />
-                            </div>
-                            <TenexityLogoFull height={28} />
+                            <TenexityLogoFull height={48} />
                             <p className="text-gray-500 mt-4">Sign in to collaborate</p>
                         </div>
 
