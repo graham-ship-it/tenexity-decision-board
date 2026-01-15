@@ -258,8 +258,12 @@
             };
 
             const signOut = async () => {
-                if (!isDevMode) {
-                    await supabaseClient.auth.signOut();
+                if (!isDevMode && supabaseClient) {
+                    try {
+                        await supabaseClient.auth.signOut();
+                    } catch (err) {
+                        console.error('Error signing out:', err);
+                    }
                 }
                 setIsDevMode(false);
                 setUser(null);
