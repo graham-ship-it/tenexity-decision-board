@@ -4,3 +4,5 @@ __pycache__/
 .DS_Store
 .env
 agent_config.py
+.vercel
+.env*.local

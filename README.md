@@ -1,8 +1,8 @@
-# Tenexity Decision Board (Recovered)
+# Tenexity Decision Board
 
-This project has been recovered and patched to fix Supabase authentication issues.
+A collaborative decision-making board with real-time sync powered by Supabase.
 
-## 🚀 How to Run
+## How to Run
 
 Because Supabase Authentication requires a valid web origin (it doesn't work with `file://`), you should run this using the included local server.
 
@@ -20,7 +20,7 @@ Go to your browser and visit:
 
 ---
 
-## 🔧 Developer Mode (Bypass Login)
+## Developer Mode (Bypass Login)
 
 If you just want to test the UI without setting up Supabase:
 
@@ -30,9 +30,9 @@ If you just want to test the UI without setting up Supabase:
 
 ---
 
-## 🔑 Fixing Supabase Auth (Real Login)
+## Supabase Auth Setup
 
-To make the real email magic links work:
+To enable email magic link login:
 
 1. Go to your [Supabase Dashboard](https://supabase.com/dashboard).
 2. Navigate to **Authentication** -> **URL Configuration**.
